@@ -26,19 +26,17 @@
   <div id="app"></div>
   <div class="panel">
     <h3>İpucu</h3>
-    <p><strong>members</strong> dizisini düzenleyerek fotoğrafları ve konumları değiştir.</p>
-    <p>Ağaç modelin varsa <strong>models/tree.glb</strong> ekle; yoksa yerleşik placeholder ağaç görünür.</p>
+    <p><strong>images</strong> klasörüne aile fotoğraflarını ve bayrakları ekle.</p>
+    <p>Ağaç modelin varsa <strong>models/tree.glb</strong> dosyasını koy.</p>
   </div>
   <div class="credit">© <span id="y"></span> Aileniz</div>
 
-  <!-- Three.js ES Modules (CDN) -->
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
     import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
     import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/DRACOLoader.js';
 
-    // ------- Temel Kurulum -------
     const container = document.getElementById('app');
     const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
     renderer.setSize(innerWidth, innerHeight);
@@ -48,352 +46,133 @@
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 1000);
-    const CAM_START = { pos:new THREE.Vector3(0, 6, 24), target:new THREE.Vector3(0, 5, 0) };
+    const CAM_START = { pos:new THREE.Vector3(0,6,24), target:new THREE.Vector3(0,5,0) };
     camera.position.copy(CAM_START.pos);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(CAM_START.target);
     controls.enableDamping = true;
-    controls.minDistance = 5;
-    controls.maxDistance = 60;
 
-    // Işıklar
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
     dir.position.set(10,15,10);
-    dir.castShadow = false;
     scene.add(dir);
 
-    // Zemin
-    const groundGeo = new THREE.CircleGeometry(30, 64);
-    const groundMat = new THREE.MeshStandardMaterial({ color:0x0f1730, roughness:1, metalness:0 });
+    const groundGeo = new THREE.CircleGeometry(30,64);
+    const groundMat = new THREE.MeshStandardMaterial({ color:0x0f1730, roughness:1 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI/2;
-    ground.position.y = 0;
     scene.add(ground);
 
-    // === DEBUG / GÖRÜNÜRLÜK TESTİ ===
-    // 1) Aşağıdaki küp sahnede görünüyorsa Three.js düzgün çalışıyor demektir.
-    const testGeo = new THREE.BoxGeometry(1,1,1);
-    const testMat = new THREE.MeshStandardMaterial({ color:0xffffff, metalness:0, roughness:1 });
-    const testCube = new THREE.Mesh(testGeo, testMat);
-    testCube.position.set(0, 1, 0);
-    scene.add(testCube);
+    // test küp
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshStandardMaterial({ color:0xffffff }));
+    cube.position.y = 1;
+    scene.add(cube);
 
-    // 2) Eksen yardımcı (kırmızı X, yeşil Y, mavi Z) — kamerayı bulmana yardım eder
-    const axes = new THREE.AxesHelper(3);
-    axes.position.set(0, 0.01, 0);
-    scene.add(axes);
-
-
-    // ------- Ağaç: GLTF varsa yükle, yoksa placeholder -------
+    // === Placeholder ağaç ===
     const treeRoot = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7,1.0,10,12), new THREE.MeshStandardMaterial({ color:0x5b3b1a }));
+    trunk.position.y = 5;
+    treeRoot.add(trunk);
+    const leafMat = new THREE.MeshStandardMaterial({ color:0x1e6a3a });
+    [5,4,3.2].forEach((h,i)=>{
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(5 - i*1.2,h,16), leafMat);
+      cone.position.y = 7 + i*1.8;
+      treeRoot.add(cone);
+    });
     scene.add(treeRoot);
 
-    let usedGLTF = false;
-    try{
-      // GLTF yükleme (opsiyonel). Eğer dosya yoksa fetch hatası çıkar ve placeholder'a düşer.
-      const gltfLoader = new GLTFLoader();
-      const draco = new DRACOLoader();
-      draco.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
-      gltfLoader.setDRACOLoader(draco);
-
-      await new Promise((resolve, reject)=>{
-        gltfLoader.load('models/tree.glb', (gltf)=>{ treeRoot.add(gltf.scene); usedGLTF=true; resolve(); }, undefined, reject);
-      });
-    }catch(e){
-      // Placeholder: gövde + yaprak konileri
-      const trunkGeo = new THREE.CylinderGeometry(0.7, 1.0, 10, 12);
-      const trunkMat = new THREE.MeshStandardMaterial({ color:0x5b3b1a, roughness:1 });
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      trunk.position.y = 5;
-      treeRoot.add(trunk);
-
-      const leafMat = new THREE.MeshStandardMaterial({ color:0x1e6a3a, roughness:0.9 });
-      const coneHeights = [5.0, 4.0, 3.2];
-      coneHeights.forEach((h,i)=>{
-        const cone = new THREE.ConeGeometry(5 - i*1.2, h, 16);
-        const mesh = new THREE.Mesh(cone, leafMat);
-        mesh.position.y = 7 + i*1.8;
-        treeRoot.add(mesh);
-      });
-    }
-
-    // Yükseklik tahmini (bayrak tepe konumu için)
     const bbox = new THREE.Box3().setFromObject(treeRoot);
     const treeTopY = bbox.max.y || 10.5;
 
-    // ------- Aile Üyeleri (3D foto kartları) -------
-    const loader = new THREE.TextureLoader();
-    const members = [
-      { id:'anne',  name:'Fatma',  img:'images/person-anne.jpg',  pos:new THREE.Vector3(-6, 8.2,  1.5), rotY: 0.2 },
-      { id:'baba',  name:'Mehmet', img:'images/person-baba.jpg',  pos:new THREE.Vector3( 6, 8.5, -1.0), rotY:-0.3 },
-      { id:'ahmet', name:'Ahmet',  img:'images/person-ben.jpg',   pos:new THREE.Vector3( 0, 5.8,  5.5), rotY: 0.0 },
-      { id:'abla',  name:'Elif',   img:'images/person-abla.jpg',  pos:new THREE.Vector3(-4, 6.2, -4.5), rotY: 0.6 },
-      { id:'dede',  name:'Ali',    img:'images/person-dede.jpg',  pos:new THREE.Vector3( 4,10.2,  0.0), rotY:-0.2 },
-    ];
-
-    const faceGroup = new THREE.Group();
-    scene.add(faceGroup);
-
-    const CARD_W = 2.4, CARD_H = 3.0, BOB_A = 0.05, ROT_A = 0.03;
-    const clickable = []; // raycaster listesi
-
-    function makeFaceCard({id,name,img,pos,rotY}){
-      const tex = loader.load(img);
-      tex.anisotropy = renderer.capabilities.getMaxAnisotropy?.() ?? 1;
-      const geo = new THREE.PlaneGeometry(CARD_W, CARD_H, 1, 1);
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent:true });
-      const card = new THREE.Mesh(geo, mat);
-      card.position.copy(pos);
-      card.rotation.y = rotY ?? 0;
-      card.userData = { id, name, baseY: pos.y, tOffset: Math.random()*Math.PI*2 };
-      faceGroup.add(card);
-      clickable.push(card);
-
-      // İsim etiketi (opsiyonel)
-      const labelCanvas = document.createElement('canvas');
-      labelCanvas.width = 256; labelCanvas.height = 64;
-      const cx = labelCanvas.getContext('2d');
-      cx.fillStyle = '#0b1020';
-      cx.fillRect(0,0,256,64);
-      cx.fillStyle = '#eaf2ff';
-      cx.font = '28px sans-serif';
-      cx.textAlign = 'center';
-      cx.textBaseline = 'middle';
-      cx.fillText(name, 128, 32);
-      const labelTex = new THREE.CanvasTexture(labelCanvas);
-      const labelMat = new THREE.SpriteMaterial({ map: labelTex, transparent:true });
-      const label = new THREE.Sprite(labelMat);
-      label.scale.set(1.8, 0.45, 1);
-      label.position.set(0, -CARD_H*0.75, 0.01);
-      card.add(label);
-
-      return card;
-    }
-
-    members.forEach(m=> makeFaceCard(m));
-
-    // ------- Küçük sallanma (bobbing + hafif dönme) -------
-    const clock = new THREE.Clock();
-
-    // ------- Raycaster ile tıklama ve kamera yakınlaştırma -------
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    // Basit tween (kütüphane yok)
-    function tweenVector3(vec, to, dur=0.9, ease=(t)=>t*(2-t)){
-      const from = vec.clone();
-      let t=0;
-      return new Promise(resolve=>{
-        function step(){
-          t += Math.min(1, clock.getDelta()/dur);
-          const k = ease(t);
-          vec.lerpVectors(from, to, k);
-          if (t < 1) requestAnimationFrame(step); else resolve();
-        }
-        requestAnimationFrame(step);
-      });
-    }
-
-    let busy = false;
-
-    function onPointer(e){
-      const rect = renderer.domElement.getBoundingClientRect();
-      const x = ( (e.clientX - rect.left) / rect.width ) * 2 - 1;
-      const y = -( (e.clientY - rect.top) / rect.height ) * 2 + 1;
-      mouse.set(x,y);
-      raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(clickable, false);
-      if (!hits.length || busy) return;
-      const card = hits[0].object;
-
-      // Hedef: kartın önünde belirli bir mesafe
-      const worldPos = new THREE.Vector3();
-      card.getWorldPosition(worldPos);
-
-      const forward = new THREE.Vector3(0,0,1).applyQuaternion(card.quaternion);
-      const camTarget = worldPos.clone();
-      const camPos    = worldPos.clone().add(forward.multiplyScalar(3.6)).add(new THREE.Vector3(0, 0.3, 0));
-
-      (async ()=>{
-        busy = true;
-        await Promise.all([
-          tweenVector3(camera.position, camPos, 0.9),
-          tweenVector3(controls.target, camTarget, 0.9)
-        ]);
-        busy = false;
-      })();
-    }
-    renderer.domElement.addEventListener('pointerdown', onPointer);
-
-    // Reset
-    document.getElementById('resetBtn').addEventListener('click', async ()=>{
-      if (busy) return;
-      busy = true;
-      await Promise.all([
-        tweenVector3(camera.position, CAM_START.pos.clone(), 0.9),
-        tweenVector3(controls.target, CAM_START.target.clone(), 0.9)
-      ]);
-      busy = false;
-    });
-
-    // Resize
-    addEventListener('resize', ()=>{
-      camera.aspect = innerWidth/innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-    });
-
-    // Yıl
-    document.getElementById('y').textContent = new Date().getFullYear();
-
-    // ========= BAYRAK SİSTEMİ =========
-    const flagVertex = /* glsl */`
+    // === Bayrak shader ===
+    const flagV = `
       uniform float uTime;
-      uniform float uAmp;
-      uniform float uFreq;
-      uniform float uSpeed;
       varying vec2 vUv;
       void main(){
-        vUv = uv;
-        float strength = smoothstep(0.0, 1.0, vUv.x);
-        float wave = sin((uv.y * uFreq) + uTime * uSpeed) * uAmp * strength;
-        vec3 pos = position;
-        pos.z += wave;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-      }
-    `;
-    const flagFragment = /* glsl */`
+        vUv=uv;
+        float w = sin((uv.y*20.)+uTime*2.)*0.12*smoothstep(0.,1.,uv.x);
+        vec3 p=position; p.z+=w;
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);
+      }`;
+    const flagF = `
       uniform sampler2D uMap;
       varying vec2 vUv;
       void main(){
-        vec4 c = texture2D(uMap, vUv);
-        if (c.a < 0.05) discard;
-        gl_FragColor = c;
-      }
-    `;
-
-    function createFlag({mapPath, height=1.2, width=1.8}){
-      const group = new THREE.Group();
-
-      const poleGeo = new THREE.CylinderGeometry(0.03, 0.03, height + 0.6, 12);
-      const poleMat = new THREE.MeshStandardMaterial({ color:0xdddddd, metalness:0.6, roughness:0.3 });
-      const pole = new THREE.Mesh(poleGeo, poleMat);
-      pole.position.set(0, height/2, 0);
-      group.add(pole);
-
-      const segX = 40, segY = 20;
-      const clothGeo = new THREE.PlaneGeometry(width, height, segX, segY);
-      clothGeo.translate(width*0.5, height*0.5, 0);
-
-      const tex = new THREE.TextureLoader().load(mapPath);
-      tex.anisotropy = renderer.capabilities.getMaxAnisotropy?.() ?? 1;
-
-      const mat = new THREE.ShaderMaterial({
-        uniforms:{
-          uTime:{ value:0 },
-          uAmp:{ value:0.12 },
-          uFreq:{ value:18.0 },
-          uSpeed:{ value:2.0 },
-          uMap:{ value: tex }
-        },
-        vertexShader: flagVertex,
-        fragmentShader: flagFragment,
-        transparent: true,
-        side: THREE.DoubleSide
+        vec4 c=texture2D(uMap,vUv);
+        if(c.a<.05)discard;
+        gl_FragColor=c;
+      }`;
+    function makeFlag(texPath){
+      const g=new THREE.PlaneGeometry(1.8,1.2,40,20);
+      g.translate(0.9,0.6,0);
+      const t=new THREE.TextureLoader().load(texPath);
+      const m=new THREE.ShaderMaterial({
+        uniforms:{uTime:{value:0},uMap:{value:t}},
+        vertexShader:flagV,fragmentShader:flagF,transparent:true,side:2
       });
-
-      const cloth = new THREE.Mesh(clothGeo, mat);
-      cloth.position.set(0.02, 0.0, 0);
-      cloth.rotation.y = Math.PI;
-      group.add(cloth);
-
-      const clipGeo = new THREE.TorusGeometry(0.045, 0.01, 8, 12);
-      const clipMat = new THREE.MeshStandardMaterial({ color:0xbbbbbb, metalness:0.4, roughness:0.6 });
-      const clip1 = new THREE.Mesh(clipGeo, clipMat);
-      clip1.rotation.x = Math.PI/2; clip1.position.set(0.0, height*0.9, 0.03);
-      const clip2 = clip1.clone(); clip2.position.y = height*0.1;
-      group.add(clip1, clip2);
-
-      group.rotation.y = -0.25;
-      group.userData.update = (t)=>{ mat.uniforms.uTime.value = t; };
+      const mesh=new THREE.Mesh(g,m);
+      const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,1.8,12),
+        new THREE.MeshStandardMaterial({color:0xdddddd,metalness:.6,roughness:.3}));
+      pole.position.y=0.9;
+      const group=new THREE.Group();
+      mesh.position.x=0.02;
+      group.add(mesh,pole);
+      group.userData.update=(t)=>m.uniforms.uTime.value=t;
       return group;
     }
 
-    const flagsRoot = new THREE.Group();
-    flagsRoot.position.set(0, treeTopY + 0.8, 0);
+    const flagsRoot=new THREE.Group();
+    flagsRoot.position.set(0,treeTopY+0.8,0);
+    const fTR=makeFlag('images/flags/tr.png');
+    const fPS=makeFlag('images/flags/palestine.png');
+    const fOT=makeFlag('images/flags/ottoman.png');
+    fTR.position.set(-1.6,0,0.2);
+    fPS.position.set(0,0,0);
+    fOT.position.set(1.6,0,-0.2);
+    flagsRoot.add(fTR,fPS,fOT);
     scene.add(flagsRoot);
 
-    const flagTR  = createFlag({ mapPath: 'images/flags/tr.png' });
-    const flagPS  = createFlag({ mapPath: 'images/flags/palestine.png' });
-    const flagOT  = createFlag({ mapPath: 'images/flags/ottoman.png' });
-
-    flagTR.position.set(-1.6, 0,  0.2);
-    flagPS.position.set( 0.0, 0,  0.0);
-    flagOT.position.set( 1.6, 0, -0.2);
-    flagTR.position.y += 0.1;
-    flagOT.position.y -= 0.05;
-    flagTR.rotation.y = -0.3; flagPS.rotation.y = -0.2; flagOT.rotation.y = -0.15;
-
-    flagsRoot.add(flagTR, flagPS, flagOT);
-
-    // ========= Cihaz sensörleri: ağacı ve bayrakları eğime göre salla =========
-    let treeRot = { x:0, z:0 };
-    let flgRot = { x:0, y:flagsRoot.rotation.y };
-
-    function enableDeviceSensors(){
-      const haveDO = ('DeviceOrientationEvent' in window);
-      const iOSNeedsPerm = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function';
-
-      if(iOSNeedsPerm){
-        DeviceMotionEvent.requestPermission().then(res=>{
-          if(res === 'granted') attachDO();
-        }).catch(()=>{});
-      } else if(haveDO){
-        attachDO();
-      }
-
-      function attachDO(){
-        window.addEventListener('deviceorientation', (e)=>{
-          const beta = (e.beta ?? 0);   // ileri-geri (-180..180)
-          const gamma = (e.gamma ?? 0); // sağ-sol (-90..90)
-          const maxTilt = 0.15; // rad
-          const tgtX = THREE.MathUtils.degToRad(beta / 90 * maxTilt);
-          const tgtZ = THREE.MathUtils.degToRad(gamma / 90 * maxTilt);
-
-          treeRot.x += (tgtX - treeRot.x) * 0.08;
-          treeRot.z += (tgtZ - treeRot.z) * 0.08;
-          treeRoot.rotation.x = treeRot.x;
-          treeRoot.rotation.z = treeRot.z;
-
-          const tgtY = -0.2 + THREE.MathUtils.degToRad(gamma / 90 * 0.15);
-          flgRot.x += (tgtX - flgRot.x) * 0.06;
-          flgRot.y += (tgtY - flgRot.y) * 0.06;
-          flagsRoot.rotation.x = flgRot.x;
-          flagsRoot.rotation.y = flgRot.y;
+    // === sensör ===
+    let treeRot={x:0,z:0},flgRot={x:0,y:flagsRoot.rotation.y};
+    function enableSensors(){
+      if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
+        DeviceMotionEvent.requestPermission().then(res=>{if(res==='granted')attach();});
+      }else attach();
+      function attach(){
+        window.addEventListener('deviceorientation',e=>{
+          const beta=e.beta||0,gamma=e.gamma||0;
+          const max=0.15;
+          const tx=THREE.MathUtils.degToRad(beta/90*max);
+          const tz=THREE.MathUtils.degToRad(gamma/90*max);
+          treeRot.x+=(tx-treeRot.x)*0.08;
+          treeRot.z+=(tz-treeRot.z)*0.08;
+          treeRoot.rotation.x=treeRot.x;
+          treeRoot.rotation.z=treeRot.z;
+          const ty=-0.2+THREE.MathUtils.degToRad(gamma/90*0.15);
+          flgRot.x+=(tx-flgRot.x)*0.06;
+          flgRot.y+=(ty-flgRot.y)*0.06;
+          flagsRoot.rotation.x=flgRot.x;
+          flagsRoot.rotation.y=flgRot.y;
         });
       }
     }
+    document.getElementById('askPermBtn').addEventListener('click',enableSensors);
+    enableSensors();
 
-    document.getElementById('askPermBtn').addEventListener('click', enableDeviceSensors);
-    // Android/masaüstü otomatik etkin: (iOS için butona basılması gerekir)
-    enableDeviceSensors();
+    document.getElementById('resetBtn').addEventListener('click',()=>{
+      camera.position.copy(CAM_START.pos);
+      controls.target.copy(CAM_START.target);
+    });
 
-    // Render döngüsü
+    document.getElementById('y').textContent=new Date().getFullYear();
+
+    const clock=new THREE.Clock();
     function animate(){
-      const t = clock.getElapsedTime();
-      clickable.forEach((card)=>{
-        const o = card.userData.tOffset || 0;
-        card.position.y = card.userData.baseY + Math.sin(t*1.5 + o)*BOB_A;
-        card.rotation.z = Math.sin(t*1.2 + o)*ROT_A;
-      });
-
-      // Bayrak dalgalanması
-      [flagTR, flagPS, flagOT].forEach(f => f.userData.update?.(t));
-
+      const t=clock.getElapsedTime();
+      [fTR,fPS,fOT].forEach(f=>f.userData.update(t));
       controls.update();
-      renderer.render(scene, camera);
+      renderer.render(scene,camera);
       requestAnimationFrame(animate);
     }
     animate();
