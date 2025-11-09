@@ -72,6 +72,20 @@
     ground.position.y = 0;
     scene.add(ground);
 
+    // === DEBUG / GÖRÜNÜRLÜK TESTİ ===
+    // 1) Aşağıdaki küp sahnede görünüyorsa Three.js düzgün çalışıyor demektir.
+    const testGeo = new THREE.BoxGeometry(1,1,1);
+    const testMat = new THREE.MeshStandardMaterial({ color:0xffffff, metalness:0, roughness:1 });
+    const testCube = new THREE.Mesh(testGeo, testMat);
+    testCube.position.set(0, 1, 0);
+    scene.add(testCube);
+
+    // 2) Eksen yardımcı (kırmızı X, yeşil Y, mavi Z) — kamerayı bulmana yardım eder
+    const axes = new THREE.AxesHelper(3);
+    axes.position.set(0, 0.01, 0);
+    scene.add(axes);
+
+
     // ------- Ağaç: GLTF varsa yükle, yoksa placeholder -------
     const treeRoot = new THREE.Group();
     scene.add(treeRoot);
